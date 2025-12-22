@@ -1,0 +1,12 @@
+name = "fluxaipor2"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+workers_dev = true
+
+# 環境變量（需要手動設置）
+# wrangler secret put POLLINATIONS_API_KEY
+
+[ai]
+binding = "AI"
