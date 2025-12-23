@@ -1,19 +1,24 @@
-import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { api, type GenerateImageParams } from '../lib/api';
-import StyleSelector from './StyleSelector';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Slider } from './ui/slider';
 import { Label } from './ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Loader2, Sparkles, Image as ImageIcon, Settings, History, Download } from 'lucide-react';
-import { downloadImage, formatDuration } from '../lib/utils';
+import { Loader2, Sparkles, Download, Trash2, Image as ImageIcon } from 'lucide-react';
+import { downloadImage } from '../lib/utils';
+import { cn } from '../lib/utils';
 
 interface ImageGeneratorProps {
   config: any;
+}
+
+interface HistoryItem {
+  image: string;
+  prompt: string;
+  metadata: any;
+  timestamp: number;
 }
 
 export default function ImageGenerator({ config }: ImageGeneratorProps) {
@@ -24,15 +29,43 @@ export default function ImageGenerator({ config }: ImageGeneratorProps) {
   const [style, setStyle] = useState('none');
   const [qualityMode, setQualityMode] = useState('standard');
   const [seed, setSeed] = useState(-1);
-  const [results, setResults] = useState<any[]>([]);
-  const [history, setHistory] = useState<any[]>([]);
+  const [currentResult, setCurrentResult] = useState<any>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+
+  // 從 LocalStorage 加載歷史
+  useEffect(() => {
+    const saved = localStorage.getItem('flux_ai_history');
+    if (saved) {
+      try {
+        setHistory(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to load history', e);
+      }
+    }
+  }, []);
+
+  // 保存歷史到 LocalStorage
+  const saveHistory = (newHistory: HistoryItem[]) => {
+    setHistory(newHistory);
+    localStorage.setItem('flux_ai_history', JSON.stringify(newHistory));
+  };
 
   const generateMutation = useMutation({
     mutationFn: (params: GenerateImageParams) => api.generateImage(params),
     onSuccess: (data) => {
-      if (data.success && data.data) {
-        setResults(data.data);
-        setHistory(prev => [...data.data, ...prev].slice(0, 50));
+      if (data.success && data.data && data.data[0]) {
+        const result = data.data[0];
+        setCurrentResult(result);
+        
+        // 添加到歷史
+        const newItem: HistoryItem = {
+          image: result.image,
+          prompt,
+          metadata: result.metadata,
+          timestamp: Date.now()
+        };
+        const newHistory = [newItem, ...history].slice(0, 50);
+        saveHistory(newHistory);
       }
     },
   });
@@ -57,50 +90,89 @@ export default function ImageGenerator({ config }: ImageGeneratorProps) {
     });
   };
 
+  const clearHistory = () => {
+    if (confirm('確定要清空歷史記錄嗎？')) {
+      saveHistory([]);
+    }
+  };
+
   const currentStyle = config.styles.find((s: any) => s.id === style);
 
+  // 按分類組織風格
+  const stylesByCategory = config.style_categories.map((category: any) => ({
+    ...category,
+    styles: config.styles.filter((s: any) => s.category === category.id)
+  }));
+
   return (
-    <div className="container mx-auto p-6">
-      {/* 頂部標題 */}
-      <div className="mb-8 text-center">
-        <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-pink-500 mb-2">
-          🎨 Flux AI Pro
-        </h1>
-        <p className="text-gray-400">
-          v{config.version} | {config.styles.length} 種風格 | 
-          {config.api_status.authenticated ? ' 🔐 已認證' : ' ⚠️ 未認證'}
-        </p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white p-6">
+      <div className="container mx-auto">
+        {/* 頂部標題 */}
+        <div className="text-center mb-8">
+          <h1 className="text-5xl font-bold mb-2">
+            <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+              🎨 Flux AI Pro
+            </span>
+          </h1>
+          <p className="text-gray-400">
+            v{config.version} | {config.styles.length} 種風格 | 
+            {config.api_status.authenticated ? ' 🔐 已認證' : ' ⚠️ 未認證'}
+          </p>
+        </div>
 
-      <Tabs defaultValue="generate" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-6">
-          <TabsTrigger value="generate" className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4" />
-            生成圖像
-          </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-2">
-            <History className="w-4 h-4" />
-            歷史記錄 ({history.length})
-          </TabsTrigger>
-        </TabsList>
-
-        {/* 生成頁面 */}
-        <TabsContent value="generate" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* 左側面板：參數 */}
-            <Card className="lg:col-span-1 bg-gray-800/50 border-gray-700">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* 左側：參數面板 */}
+          <div className="space-y-4">
+            {/* 提示詞 */}
+            <Card className="bg-gray-800/50 border-gray-700">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-500">
-                  <Settings className="w-5 h-5" />
-                  生成參數
+                <CardTitle className="flex items-center gap-2 text-purple-400">
+                  💬 提示詞
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* 模型選擇 */}
+                <div className="space-y-2">
+                  <Label>正面提示詞</Label>
+                  <Textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="描述你想生成的圖像...
+
+例如：
+• A beautiful sunset over mountains
+• 一隻可愛的貓咪在花園裡玩耍
+• Cyberpunk city at night, neon lights"
+                    rows={6}
+                    className="bg-gray-900/50 border-gray-700"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>負面提示詞（可選）</Label>
+                  <Textarea
+                    value={negativePrompt}
+                    onChange={(e) => setNegativePrompt(e.target.value)}
+                    placeholder="不想要的內容... 例如：blurry, low quality"
+                    rows={2}
+                    className="bg-gray-900/50 border-gray-700"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 生成參數 */}
+            <Card className="bg-gray-800/50 border-gray-700">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-purple-400">
+                  ⚙️ 生成參數
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* 模型 */}
                 <div className="space-y-2">
                   <Label>模型</Label>
                   <Select value={model} onValueChange={setModel}>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-gray-900/50 border-gray-700">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -113,11 +185,11 @@ export default function ImageGenerator({ config }: ImageGeneratorProps) {
                   </Select>
                 </div>
 
-                {/* 尺寸選擇 */}
+                {/* 尺寸 */}
                 <div className="space-y-2">
                   <Label>尺寸</Label>
                   <Select value={size} onValueChange={setSize}>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-gray-900/50 border-gray-700">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -134,7 +206,7 @@ export default function ImageGenerator({ config }: ImageGeneratorProps) {
                 <div className="space-y-2">
                   <Label>質量模式</Label>
                   <Select value={qualityMode} onValueChange={setQualityMode}>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-gray-900/50 border-gray-700">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -150,70 +222,21 @@ export default function ImageGenerator({ config }: ImageGeneratorProps) {
                 {/* Seed */}
                 <div className="space-y-2">
                   <Label>Seed (-1 = 隨機)</Label>
-                  <Slider
-                    value={[seed]}
-                    onValueChange={(v) => setSeed(v[0])}
+                  <input
+                    type="number"
+                    value={seed}
+                    onChange={(e) => setSeed(parseInt(e.target.value))}
                     min={-1}
                     max={999999}
-                    step={1}
-                    className="w-full"
-                  />
-                  <p className="text-xs text-gray-500">{seed}</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 中間面板：提示詞和結果 */}
-            <Card className="lg:col-span-2 bg-gray-800/50 border-gray-700">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-500">
-                  <ImageIcon className="w-5 h-5" />
-                  提示詞與結果
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* 正面提示詞 */}
-                <div className="space-y-2">
-                  <Label>正面提示詞</Label>
-                  <Textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="描述你想生成的圖像...
-
-例如：
-• A beautiful sunset over mountains
-• 一隻可愛的貓咖在花園裡玩耶
-• Cyberpunk city at night"
-                    rows={6}
-                    className="bg-gray-900/50"
+                    className="w-full h-10 bg-gray-900/50 border border-gray-700 rounded-md px-3 text-white"
                   />
                 </div>
-
-                {/* 負面提示詞 */}
-                <div className="space-y-2">
-                  <Label>負面提示詞 (可選)</Label>
-                  <Textarea
-                    value={negativePrompt}
-                    onChange={(e) => setNegativePrompt(e.target.value)}
-                    placeholder="不想要的內容...例：blurry, low quality"
-                    rows={2}
-                    className="bg-gray-900/50"
-                  />
-                </div>
-
-                {/* 風格選擇 */}
-                <StyleSelector
-                  styles={config.styles}
-                  categories={config.style_categories}
-                  selectedStyle={style}
-                  onStyleChange={setStyle}
-                />
 
                 {/* 生成按鈕 */}
                 <Button
                   onClick={handleGenerate}
                   disabled={generateMutation.isPending}
-                  className="w-full bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
+                  className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
                   size="lg"
                 >
                   {generateMutation.isPending ? (
@@ -228,97 +251,171 @@ export default function ImageGenerator({ config }: ImageGeneratorProps) {
                     </>
                   )}
                 </Button>
+              </CardContent>
+            </Card>
+          </div>
 
-                {/* 當前風格信息 */}
-                {currentStyle && (
-                  <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg">
-                    <p className="text-sm text-purple-300">
-                      <strong>🎨 當前風格：</strong> {currentStyle.icon} {currentStyle.name}
-                    </p>
-                    {currentStyle.prompt && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        {currentStyle.prompt}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* 結果顯示 */}
-                {generateMutation.isError && (
-                  <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-                    <p className="text-red-400">❌ 生成失敗</p>
-                  </div>
-                )}
-
-                {results.length > 0 && (
-                  <div className="space-y-4">
-                    {results.map((result, idx) => (
-                      <div key={idx} className="border border-gray-700 rounded-lg overflow-hidden">
-                        <img
-                          src={result.image}
-                          alt="Generated"
-                          className="w-full h-auto"
-                        />
-                        <div className="p-4 bg-gray-900/50">
-                          <div className="flex flex-wrap gap-2 mb-2">
-                            <span className="px-2 py-1 bg-orange-500/20 text-orange-300 rounded text-xs">
-                              {result.metadata.model}
-                            </span>
-                            <span className="px-2 py-1 bg-green-500/20 text-green-300 rounded text-xs">
-                              Seed: {result.metadata.seed}
-                            </span>
-                            <span className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded text-xs">
-                              {result.metadata.width}x{result.metadata.height}
-                            </span>
-                          </div>
-                          <Button
-                            onClick={() => downloadImage(result.image, `flux-${result.metadata.seed}.png`)}
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            下載
-                          </Button>
+          {/* 中間：風格選擇 */}
+          <div>
+            <Card className="bg-gray-800/50 border-gray-700">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-purple-400">
+                  🎨 藝術風格
+                </CardTitle>
+                <CardDescription>
+                  {currentStyle && (
+                    <span className="text-purple-300">
+                      當前：{currentStyle.icon} {currentStyle.name}
+                    </span>
+                  )}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4 max-h-[650px] overflow-y-auto">
+                  {stylesByCategory.map((category: any) => (
+                    category.styles.length > 0 && (
+                      <div key={category.id}>
+                        <h3 className="text-sm font-semibold text-gray-400 mb-2">
+                          {category.icon} {category.name}
+                        </h3>
+                        <div className="grid grid-cols-2 gap-2">
+                          {category.styles.map((s: any) => (
+                            <button
+                              key={s.id}
+                              onClick={() => setStyle(s.id)}
+                              className={cn(
+                                'p-3 rounded-lg border transition-all text-left',
+                                style === s.id
+                                  ? 'bg-purple-500/20 border-purple-500'
+                                  : 'bg-gray-900/50 border-gray-700 hover:border-purple-500/50'
+                              )}
+                            >
+                              <div className="text-xl mb-1">{s.icon}</div>
+                              <div className="text-sm font-medium">{s.name}</div>
+                            </button>
+                          ))}
                         </div>
                       </div>
+                    )
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 右側：結果展示 */}
+          <div className="space-y-4">
+            <Card className="bg-gray-800/50 border-gray-700">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-purple-400">
+                  🖼️ 生成結果
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {generateMutation.isPending && (
+                  <div className="text-center py-20">
+                    <Loader2 className="w-12 h-12 animate-spin text-purple-500 mx-auto mb-4" />
+                    <p className="text-gray-400">AI 正在創作中...</p>
+                    <p className="text-sm text-gray-500 mt-2">這可能需要 30-60 秒</p>
+                  </div>
+                )}
+
+                {generateMutation.isError && (
+                  <div className="text-center py-20 text-red-400">
+                    <p className="text-4xl mb-4">❌</p>
+                    <p>生成失敗</p>
+                  </div>
+                )}
+
+                {!generateMutation.isPending && !currentResult && (
+                  <div className="text-center text-gray-400 py-20">
+                    <ImageIcon className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                    <p>尚未生成圖像</p>
+                    <p className="text-sm mt-2">填寫參數後點擊生成</p>
+                  </div>
+                )}
+
+                {currentResult && (
+                  <div className="space-y-4">
+                    <img
+                      src={currentResult.image}
+                      alt="Generated"
+                      className="w-full rounded-lg border border-gray-700"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <span className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-xs">
+                        {currentResult.metadata.model}
+                      </span>
+                      <span className="px-3 py-1 bg-green-500/20 text-green-300 rounded-full text-xs">
+                        Seed: {currentResult.metadata.seed}
+                      </span>
+                      <span className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs">
+                        {currentResult.metadata.width}x{currentResult.metadata.height}
+                      </span>
+                    </div>
+                    <Button
+                      onClick={() => downloadImage(currentResult.image, `flux-${currentResult.metadata.seed}.png`)}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      下載圖片
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 歷史記錄 */}
+            <Card className="bg-gray-800/50 border-gray-700">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-purple-400">
+                    📚 歷史記錄
+                  </span>
+                  {history.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearHistory}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  總共 {history.length} 條記錄
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {history.length === 0 ? (
+                  <p className="text-center text-gray-400 py-8">暫無歷史</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto">
+                    {history.map((item, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentResult({ image: item.image, metadata: item.metadata })}
+                        className="relative group"
+                      >
+                        <img
+                          src={item.image}
+                          alt="History"
+                          className="w-full h-24 object-cover rounded-lg border border-gray-700 group-hover:border-purple-500 transition-colors"
+                        />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                          <span className="text-white text-xs">查看</span>
+                        </div>
+                      </button>
                     ))}
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-
-        {/* 歷史記錄 */}
-        <TabsContent value="history">
-          <Card className="bg-gray-800/50 border-gray-700">
-            <CardHeader>
-              <CardTitle>歷史記錄</CardTitle>
-              <CardDescription>總共 {history.length} 條記錄</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {history.length === 0 ? (
-                <p className="text-center text-gray-500 py-8">暫無歷史記錄</p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {history.map((item, idx) => (
-                    <div key={idx} className="border border-gray-700 rounded-lg overflow-hidden">
-                      <img src={item.image} alt="History" className="w-full h-48 object-cover" />
-                      <div className="p-3 bg-gray-900/50">
-                        <div className="flex gap-2 text-xs text-gray-400">
-                          <span>{item.metadata.model}</span>
-                          <span>Seed: {item.metadata.seed}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
     </div>
   );
 }
