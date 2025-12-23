@@ -1,13 +1,390 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-TW">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>All-Flux AI 圖像生成</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flux AI Pro - AI 圖像生成器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .animate-spin { animation: spin 1s linear infinite; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .glass { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); }
+        .style-card { transition: all 0.3s; cursor: pointer; }
+        .style-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3); }
+        .style-card.active { border: 2px solid #8b5cf6; background: rgba(139, 92, 246, 0.2); }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 min-h-screen text-white">
+    <div class="container mx-auto px-4 py-8">
+        <!-- 頂部標題 -->
+        <div class="text-center mb-8">
+            <h1 class="text-5xl font-bold mb-2">
+                <span class="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                    🎨 Flux AI Pro
+                </span>
+            </h1>
+            <p class="text-gray-400">AI 圖像生成器 | 45+ 藝術風格</p>
+            <div id="apiStatus" class="mt-2 text-sm"></div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- 左側：參數面板 -->
+            <div class="lg:col-span-1 space-y-4">
+                <!-- 提示詞 -->
+                <div class="glass rounded-xl p-6">
+                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+                        💬 提示詞
+                    </h2>
+                    <textarea 
+                        id="prompt" 
+                        rows="5" 
+                        placeholder="描述你想生成的圖像...
+
+例如：
+• A beautiful sunset over mountains
+• 一隻可愛的貓咪在花園裡玩耍
+• Cyberpunk city at night, neon lights"
+                        class="w-full bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    ></textarea>
+                    
+                    <div class="mt-4">
+                        <label class="text-sm text-gray-400 mb-2 block">負面提示詞（可選）</label>
+                        <textarea 
+                            id="negativePrompt" 
+                            rows="2" 
+                            placeholder="不想要的內容... 例如：blurry, low quality"
+                            class="w-full bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                        ></textarea>
+                    </div>
+                </div>
+
+                <!-- 基本參數 -->
+                <div class="glass rounded-xl p-6">
+                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+                        ⚙️ 生成參數
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <!-- 模型 -->
+                        <div>
+                            <label class="text-sm text-gray-400 mb-2 block">模型</label>
+                            <select id="model" class="w-full bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                                <option value="zimage">⚡ Z-Image Turbo</option>
+                                <option value="flux">🎨 Flux 標準版</option>
+                                <option value="turbo">⚡ Flux Turbo</option>
+                                <option value="kontext">🖼️ Kontext</option>
+                            </select>
+                        </div>
+
+                        <!-- 尺寸 -->
+                        <div>
+                            <label class="text-sm text-gray-400 mb-2 block">尺寸</label>
+                            <select id="size" class="w-full bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                                <option value="1024,1024">⬜ 方形 1024x1024</option>
+                                <option value="1536,1536">⬜ 方形 1536x1536</option>
+                                <option value="1080,1920">📱 豎屏 1080x1920</option>
+                                <option value="1920,1080">🖥️ 橫屏 1920x1080</option>
+                            </select>
+                        </div>
+
+                        <!-- 質量模式 -->
+                        <div>
+                            <label class="text-sm text-gray-400 mb-2 block">質量模式</label>
+                            <select id="qualityMode" class="w-full bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                                <option value="economy">⚡ 經濟模式</option>
+                                <option value="standard" selected>⚖️ 標準模式</option>
+                                <option value="ultra">💎 超高清模式</option>
+                            </select>
+                        </div>
+
+                        <!-- Seed -->
+                        <div>
+                            <label class="text-sm text-gray-400 mb-2 block">Seed (-1 = 隨機)</label>
+                            <input 
+                                type="number" 
+                                id="seed" 
+                                value="-1" 
+                                min="-1" 
+                                max="999999"
+                                class="w-full bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- 生成按鈕 -->
+                    <button 
+                        id="generateBtn" 
+                        onclick="generateImage()" 
+                        class="w-full mt-6 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-4 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <span id="btnText">✨ 開始生成</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 中間：風格選擇 -->
+            <div class="lg:col-span-1">
+                <div class="glass rounded-xl p-6">
+                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+                        🎨 藝術風格
+                    </h2>
+                    <div id="styleSelector" class="space-y-2 max-h-[600px] overflow-y-auto">
+                        <!-- 動態生成 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右側：結果展示 -->
+            <div class="lg:col-span-1">
+                <div class="glass rounded-xl p-6">
+                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+                        🖼️ 生成結果
+                    </h2>
+                    <div id="resultContainer">
+                        <div class="text-center text-gray-400 py-20">
+                            <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            <p>尚未生成圖像</p>
+                            <p class="text-sm mt-2">填寫參數後點擊生成</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 歷史記錄 -->
+                <div class="glass rounded-xl p-6 mt-6">
+                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+                        📚 歷史記錄
+                        <button onclick="clearHistory()" class="ml-auto text-sm text-red-400 hover:text-red-300">🗑️ 清空</button>
+                    </h2>
+                    <div id="historyContainer" class="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto">
+                        <p class="col-span-2 text-center text-gray-400 py-8">暫無歷史</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STYLES = {
+            none: { name: '無風格', icon: '⚡', category: '基礎' },
+            anime: { name: '動漫', icon: '🎭', category: '插畫' },
+            ghibli: { name: '吉卜力', icon: '🍃', category: '插畫' },
+            manga: { name: '日本漫畫', icon: '📖', category: '漫畫' },
+            'manga-color': { name: '彩色漫畫', icon: '🎨', category: '漫畫' },
+            chibi: { name: 'Q版', icon: '🥰', category: '漫畫' },
+            photorealistic: { name: '寫實', icon: '📷', category: '寫實' },
+            'oil-painting': { name: '油畫', icon: '🖼️', category: '繪畫' },
+            watercolor: { name: '水彩', icon: '💧', category: '繪畫' },
+            cyberpunk: { name: '賽博朋克', icon: '🌃', category: '視覺' },
+            neon: { name: '霓虹', icon: '💡', category: '視覺' },
+            vintage: { name: '復古', icon: '📻', category: '視覺' },
+            'pixel-art': { name: '像素', icon: '🎮', category: '數位' },
+            '3d-render': { name: '3D渲染', icon: '🎬', category: '數位' },
+            fantasy: { name: '奇幻', icon: '🐉', category: '奇幻' }
+        };
+
+        let selectedStyle = 'none';
+        let history = JSON.parse(localStorage.getItem('aiImageHistory') || '[]');
+
+        // 初始化
+        async function init() {
+            renderStyleSelector();
+            renderHistory();
+            await checkAPIStatus();
+        }
+
+        // 渲染風格選擇器
+        function renderStyleSelector() {
+            const container = document.getElementById('styleSelector');
+            let html = '';
+            
+            Object.entries(STYLES).forEach(([id, style]) => {
+                const isActive = id === selectedStyle ? 'active' : '';
+                html += `
+                    <div class="style-card ${isActive} bg-gray-800/50 border border-gray-700 rounded-lg p-3" onclick="selectStyle('${id}')">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">${style.icon}</span>
+                            <div>
+                                <p class="font-semibold">${style.name}</p>
+                                <p class="text-xs text-gray-400">${style.category}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // 選擇風格
+        function selectStyle(styleId) {
+            selectedStyle = styleId;
+            renderStyleSelector();
+        }
+
+        // 檢查 API 狀態
+        async function checkAPIStatus() {
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                document.getElementById('apiStatus').innerHTML = `
+                    <span class="text-green-400">✅ API 正常</span>
+                    <span class="text-gray-500 mx-2">|</span>
+                    <span class="text-gray-400">v${data.data.version}</span>
+                `;
+            } catch (e) {
+                document.getElementById('apiStatus').innerHTML = '<span class="text-red-400">❌ API 連接失敗</span>';
+            }
+        }
+
+        // 生成圖像
+        async function generateImage() {
+            const prompt = document.getElementById('prompt').value.trim();
+            if (!prompt) {
+                alert('請輸入提示詞！');
+                return;
+            }
+
+            const btn = document.getElementById('generateBtn');
+            const btnText = document.getElementById('btnText');
+            const resultContainer = document.getElementById('resultContainer');
+            
+            // 禁用按鈕
+            btn.disabled = true;
+            btnText.innerHTML = '<span class="animate-spin inline-block">⚙️</span> 生成中...';
+            
+            // 顯示加載
+            resultContainer.innerHTML = `
+                <div class="text-center py-20">
+                    <div class="animate-spin text-6xl mb-4">⚙️</div>
+                    <p class="text-gray-400">AI 正在創作中...</p>
+                    <p class="text-sm text-gray-500 mt-2">這可能需要 30-60 秒</p>
+                </div>
+            `;
+
+            try {
+                const [width, height] = document.getElementById('size').value.split(',').map(Number);
+                
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt,
+                        model: document.getElementById('model').value,
+                        width,
+                        height,
+                        negative_prompt: document.getElementById('negativePrompt').value,
+                        style: selectedStyle,
+                        quality_mode: document.getElementById('qualityMode').value,
+                        seed: parseInt(document.getElementById('seed').value)
+                    })
+                });
+
+                if (response.ok) {
+                    const contentType = response.headers.get('content-type');
+                    
+                    if (contentType?.startsWith('image/')) {
+                        const blob = await response.blob();
+                        const imageUrl = URL.createObjectURL(blob);
+                        displayImage(imageUrl, {
+                            model: response.headers.get('x-model'),
+                            seed: response.headers.get('x-seed'),
+                            width: response.headers.get('x-width'),
+                            height: response.headers.get('x-height')
+                        });
+                        addToHistory({ imageUrl, prompt, metadata: {} });
+                    } else {
+                        const data = await response.json();
+                        if (data.success && data.data[0]) {
+                            displayImage(data.data[0].image, data.data[0].metadata);
+                            addToHistory({ imageUrl: data.data[0].image, prompt, metadata: data.data[0].metadata });
+                        }
+                    }
+                } else {
+                    throw new Error('生成失敗');
+                }
+            } catch (error) {
+                resultContainer.innerHTML = `
+                    <div class="text-center py-20 text-red-400">
+                        <p class="text-4xl mb-4">❌</p>
+                        <p>生成失敗</p>
+                        <p class="text-sm text-gray-400 mt-2">${error.message}</p>
+                    </div>
+                `;
+            } finally {
+                btn.disabled = false;
+                btnText.innerHTML = '✨ 開始生成';
+            }
+        }
+
+        // 顯示圖像
+        function displayImage(imageUrl, metadata) {
+            const container = document.getElementById('resultContainer');
+            container.innerHTML = `
+                <div class="fade-in">
+                    <img src="${imageUrl}" class="w-full rounded-lg mb-4 border border-gray-700">
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <span class="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-xs">${metadata.model || 'unknown'}</span>
+                        <span class="px-3 py-1 bg-green-500/20 text-green-300 rounded-full text-xs">Seed: ${metadata.seed || 'N/A'}</span>
+                        <span class="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs">${metadata.width}x${metadata.height}</span>
+                    </div>
+                    <button onclick="downloadImage('${imageUrl}', ${metadata.seed})" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+                        💾 下載圖片
+                    </button>
+                </div>
+            `;
+        }
+
+        // 下載圖片
+        function downloadImage(url, seed) {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `flux-ai-${seed || Date.now()}.png`;
+            a.click();
+        }
+
+        // 添加到歷史
+        function addToHistory(item) {
+            history.unshift({ ...item, timestamp: Date.now() });
+            if (history.length > 20) history = history.slice(0, 20);
+            localStorage.setItem('aiImageHistory', JSON.stringify(history));
+            renderHistory();
+        }
+
+        // 渲染歷史
+        function renderHistory() {
+            const container = document.getElementById('historyContainer');
+            if (history.length === 0) {
+                container.innerHTML = '<p class="col-span-2 text-center text-gray-400 py-8">暫無歷史</p>';
+                return;
+            }
+            
+            let html = '';
+            history.forEach((item, idx) => {
+                html += `
+                    <div class="cursor-pointer hover:opacity-80 transition-opacity" onclick="displayImage('${item.imageUrl}', ${JSON.stringify(item.metadata).replace(/"/g, '&quot;')})">
+                        <img src="${item.imageUrl}" class="w-full h-24 object-cover rounded-lg border border-gray-700">
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // 清空歷史
+        function clearHistory() {
+            if (confirm('確定要清空歷史記錄嗎？')) {
+                history = [];
+                localStorage.removeItem('aiImageHistory');
+                renderHistory();
+            }
+        }
+
+        // 初始化
+        init();
+    </script>
+</body>
 </html>
