@@ -1,144 +1,203 @@
-# All-Flux Frontend
+# 🎨 Flux AI Pro v10 - 方案 B （分離架構）
 
-基於 Vite + React + TypeScript + shadcn/ui 的 AI 圖像生成前端應用。
+> AI 圖像生成器 - Worker API + React 前端 + Radix UI
 
-## 技術棧
+## 🎯 架構說明
 
-- **框架**: React 18 + TypeScript
-- **構建工具**: Vite
-- **UI 組件**: shadcn/ui + Radix UI
-- **樣式**: Tailwind CSS
-- **狀態管理**: TanStack Query
-- **表單處理**: React Hook Form + Zod
-- **HTTP 客戶端**: Axios
-
-## 功能特性
-
-✨ **AI 圖像生成**
-- 支持多個模型：Z-Image Turbo、Flux、Flux Turbo、Kontext
-- 45+ 種藝術風格預設
-- 靈活的尺寸配置（方形、橫屏、豎屏）
-- 質量模式選擇（經濟、標準、超高清）
-
-🎨 **用戶體驗**
-- 響應式設計，支持移動端
-- 暗色模式支持
-- 圖像歷史記錄（本地存儲）
-- 實時生成進度顯示
-- 圖像下載和復用功能
-
-## 開始使用
-
-### 安裝依賴
-
-```bash
-cd frontend
-npm install
+```
+all-flux/
+├── worker.js           # Cloudflare Worker API 後端 (純 API)
+├── wrangler.toml        # Worker 配置
+├── package.json         # 前端依賴
+├── vite.config.ts       # Vite 構建配置
+└── src/                 # React 前端應用
+    ├── App.tsx
+    ├── main.tsx
+    ├── lib/
+    │   ├── api.ts         # API 調用邏輯
+    │   └── utils.ts
+    └── components/
+        ├── ImageGenerator.tsx
+        ├── StyleSelector.tsx
+        └── ui/              # Radix UI 組件
 ```
 
-### 開發模式
+## ✨ 功能特點
+
+### API 後端 (Worker)
+- ✅ 純 RESTful API
+- ✅ Workers AI 中文翻譯
+- ✅ 45+ 風格預設
+- ✅ 智能參數優化
+- ✅ 多模型支持 (Z-Image, Flux, Turbo, Kontext)
+
+### 前端 (React + Radix UI)
+- ✅ 現代化 UI/UX
+- ✅ Radix UI 無障礙組件
+- ✅ Tailwind CSS 樣式
+- ✅ React Query 狀態管理
+- ✅ 歷史記錄功能
+- ✅ 響應式設計
+
+## 🚀 快速開始
+
+### 1. 部署 Worker API
 
 ```bash
-# 啟動開發服務器
+# 設置 API Key
+wrangler secret put POLLINATIONS_API_KEY
+
+# 部署 Worker
+wrangler deploy
+
+# 測試 API
+curl https://your-worker.workers.dev/api/health
+```
+
+### 2. 開發前端
+
+```bash
+# 安裝依賴
+npm install
+
+# 啟動開發伺服器
 npm run dev
 
-# 同時在另一個終端啟動 Worker
-cd ..
-npx wrangler dev
+# 訪問 http://localhost:3000
 ```
 
-訪問 http://localhost:5173
-
-### 生產構建
+### 3. 部署前端到 Cloudflare Pages
 
 ```bash
-npm run build
-npm run preview
-```
-
-## 項目結構
-
-```
-frontend/
-├── src/
-│   ├── components/        # React 組件
-│   │   ├── ui/           # shadcn/ui 基礎組件
-│   │   ├── generate-form.tsx
-│   │   ├── image-gallery.tsx
-│   │   └── ...
-│   ├── lib/              # 工具函數
-│   │   ├── api.ts        # API 客戶端
-│   │   ├── storage.ts    # 本地存儲
-│   │   └── utils.ts      # 通用工具
-│   ├── config/           # 配置文件
-│   │   └── styles.ts     # 風格預設
-│   ├── types/            # TypeScript 類型
-│   │   └── api.ts
-│   ├── App.tsx           # 主應用組件
-│   ├── main.tsx          # 入口文件
-│   └── index.css         # 全局樣式
-├── public/               # 靜態資源
-├── index.html
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-└── tailwind.config.js
-```
-
-## 配置說明
-
-### API 端點配置
-
-編輯 `src/lib/api.ts`：
-
-```typescript
-const API_BASE_URL = import.meta.env.PROD 
-  ? 'https://your-worker.workers.dev' // 生產環境
-  : '' // 開發環境使用 Vite proxy
-```
-
-### 環境變量
-
-創建 `.env` 文件：
-
-```env
-VITE_API_URL=https://your-worker.workers.dev
-```
-
-## 部署
-
-### Cloudflare Pages
-
-```bash
-# 構建
+# 構建生產版本
 npm run build
 
-# 部署
+# 部署到 Pages
 npx wrangler pages deploy dist
 ```
 
-### Vercel / Netlify
+## 📁 API 端點
 
-1. 構建命令: `npm run build`
-2. 輸出目錄: `dist`
-3. 設置環境變量 `VITE_API_URL`
-
-## 開發指南
-
-### 添加新的 shadcn/ui 組件
+### POST /api/generate
+生成圖像
 
 ```bash
-npx shadcn@latest add [component-name]
+curl -X POST https://your-worker.workers.dev/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "A beautiful sunset over mountains",
+    "model": "zimage",
+    "width": 1024,
+    "height": 1024,
+    "style": "anime",
+    "quality_mode": "standard"
+  }'
 ```
 
-### 自定義風格
+### GET /api/config
+獲取配置信息（模型、風格、尺寸等）
 
-編輯 `src/config/styles.ts` 添加新的藝術風格預設。
+```bash
+curl https://your-worker.workers.dev/api/config
+```
 
-### API 集成
+### GET /api/health
+健康檢查
 
-所有 API 調用都在 `src/lib/api.ts` 中定義，使用 axios 和 TanStack Query 進行數據管理。
+```bash
+curl https://your-worker.workers.dev/api/health
+```
 
-## 許可證
+## 🎨 支持的風格
 
-MIT
+### 10 大分類，45+ 風格
+
+- 🎨 **插畫動畫**: 動漫、吉卜力
+- 📖 **漫畫**: 日本漫畫、美式漫畫、Q版
+- ⚫ **黑白**: 素描、水墨
+- 📷 **寫實**: 超高清攝影
+- 🖼️ **繪畫**: 油畫、水彩
+- 🎭 **藝術流派**: 印象派、抽象、立體主義、超現實
+- ✨ **視覺風格**: 霸虹、復古、賽博朋克、蒸汽朋克
+- 💻 **數位**: 像素、低多邊形、3D渲染
+- 🐉 **奇幻**: 魔法、史詩
+
+## 🔧 技術棧
+
+### 後端
+- Cloudflare Workers
+- Workers AI (m2m100-1.2b)
+- Pollinations.ai API
+
+### 前端
+- React 18
+- TypeScript
+- Vite
+- Radix UI
+- Tailwind CSS
+- TanStack Query
+- Axios
+- Lucide Icons
+
+## 💻 開發
+
+```bash
+# 本地開發（同時啟動 Worker 和前端）
+
+# Terminal 1: 啟動 Worker
+npx wrangler dev
+
+# Terminal 2: 啟動前端
+npm run dev
+```
+
+前端會自動代理 `/api` 請求到 Worker。
+
+## 🔐 環境變量
+
+### Worker
+```bash
+POLLINATIONS_API_KEY=your_api_key_here
+```
+
+### 前端 (生產環境)
+在 `src/lib/api.ts` 中修改：
+```typescript
+const API_BASE = 'https://your-worker.workers.dev/api';
+```
+
+## 🚀 部署流程
+
+### 選項 1：分離部署（推薦）
+
+1. **Worker API**: Cloudflare Workers
+2. **前端**: Cloudflare Pages / Vercel / Netlify
+
+### 選項 2：同域名部署
+
+使用 Cloudflare Pages + Workers 整合：
+- Pages 處理静態文件
+- Worker 處理 `/api/*` 路徑
+
+## 🐞 常見問題
+
+### Q: 前端無法連接 API？
+A: 確保 `src/lib/api.ts` 中的 `API_BASE` 指向正確的 Worker 地址。
+
+### Q: CORS 錯誤？
+A: Worker 已配置 CORS，如果仍有問題，檢查是否使用 HTTPS。
+
+### Q: 翻譯功能不工作？
+A: 確保 Worker 的 `wrangler.toml` 中已啟用 `[ai]` binding。
+
+## 📝 License
+
+MIT License
+
+## 💬 聯繫
+
+GitHub: [@kinai9661](https://github.com/kinai9661)
+
+---
+
+**Enjoy creating amazing AI art! 🎨✨**
